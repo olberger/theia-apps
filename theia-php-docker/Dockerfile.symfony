@@ -1,0 +1,52 @@
+# Theia for PHP 7 + composer development
+
+FROM debian:buster
+
+RUN apt-get update -qq \
+ && apt-get install -y --no-install-recommends build-essential  \
+    apt-transport-https curl ca-certificates gnupg2 apt-utils
+
+RUN apt-get install -y composer
+
+# Install node from nodesource
+RUN curl -sL https://deb.nodesource.com/setup_11.x | bash - \
+    && apt-get install -y nodejs
+
+# Install yarn
+RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+ && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+ && apt-get update -qq \
+ && apt-get install -y yarn
+
+# Bits needed for Symfony with composer
+RUN apt-get install -y php-sqlite3 php-xml php-curl php-intl
+
+# Test
+#RUN yarn --version
+
+#RUN rm -rf /var/lib/apt/lists/*
+
+# See : https://github.com/theia-ide/theia-apps/issues/34
+RUN adduser --disabled-password --gecos '' theia
+RUN chmod g+rw /home && \
+    mkdir -p /home/project && \
+    chown -R theia:theia /home/theia && \
+    chown -R theia:theia /home/project
+WORKDIR /home/theia
+USER theia
+
+#ARG version=latest
+ARG version=next
+ADD $version.package.json ./package.json
+ARG GITHUB_TOKEN
+RUN yarn --cache-folder ./ycache && rm -rf ./ycache
+RUN yarn theia build
+
+# For Theia
+EXPOSE 3000
+
+# For php -S
+EXPOSE 8000
+
+ENV SHELL /bin/bash
+ENTRYPOINT [ "yarn", "theia", "start", "/home/project", "--hostname=0.0.0.0" ]
